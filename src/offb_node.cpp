@@ -11,7 +11,7 @@ nav_msgs::Odometry odom;
 
 int set_goal_cnt = 0;
 
-double dist(nav_msgs::Odometry now_pose, geometry_msgs::PoseStamped goal);
+double dist(nav_msgs::Odometry now_pose, geometry_msgs::PoseStamped* goal);
 
 //------------------------------------------------------------//
 
@@ -28,15 +28,61 @@ void odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
     odom.pose.pose.position.y = msg->pose.pose.position.y;
     odom.pose.pose.position.z = msg->pose.pose.position.z;
 }
-double dist(nav_msgs::Odometry now, geometry_msgs::PoseStamped goal)
+double dist(nav_msgs::Odometry now, geometry_msgs::PoseStamped* goal)
 {
     double dist = sqrt(
-                        pow(now.pose.pose.position.x - goal.pose.position.x,2) + 
-                        pow(now.pose.pose.position.y - goal.pose.position.y,2) +
-                        pow(now.pose.pose.position.z - goal.pose.position.z,2)
+                        pow(now.pose.pose.position.x - (*goal).pose.position.x,2) + 
+                        pow(now.pose.pose.position.y - (*goal).pose.position.y,2) +
+                        pow(now.pose.pose.position.z - (*goal).pose.position.z,2)
                       );
 
     return dist;
+}
+
+void position_control(geometry_msgs::PoseStamped* goal_)
+{
+   geometry_msgs::PoseStamped* goal;
+   goal = goal_; //구조체 포인터로 주소값 받아옴
+
+   double* pose_x = &goal->pose.position.x;
+   double* pose_y = &goal->pose.position.y;
+   double* pose_z = &goal->pose.position.z;
+    
+   
+    if(dist(odom, goal) < 0.2)
+        {
+            //waypoint에 도착하면 다음 goal_pose setting
+            ROS_INFO("arrived at [%d]", set_goal_cnt);
+            if(set_goal_cnt == 0)
+            {
+                *pose_x = 0;
+                *pose_y = 2;
+                *pose_z = 2;
+                set_goal_cnt = 1;
+            }
+            else if(set_goal_cnt == 1)
+            {
+                *pose_x = 2;
+                *pose_y = 2;
+                *pose_z = 2;
+                set_goal_cnt = 2;
+            }
+            else if(set_goal_cnt == 2)
+            {
+                *pose_x = 2;
+                *pose_y = 0;
+                *pose_z = 2;
+                set_goal_cnt = 3;
+            }
+            else if(set_goal_cnt == 3)
+            {
+                *pose_x = 0;
+                *pose_y = 0;
+                *pose_z = 2;
+                set_goal_cnt = 0;
+            }
+        }
+        //local_pos_pub.publish(goal);
 }
 
 int main(int argc, char **argv)
@@ -72,7 +118,7 @@ int main(int argc, char **argv)
     geometry_msgs::PoseStamped goal;
     goal.pose.position.x = 0;
     goal.pose.position.y = 0;
-    goal.pose.position.z = 5;
+    goal.pose.position.z = 2;
 
     //send a few setpoints before starting
     for(int i = 100; ros::ok() && i > 0; --i){
@@ -108,40 +154,8 @@ int main(int argc, char **argv)
             }
         }
 
-        if(dist(odom, goal) < 0.2)
-        {
-            //waypoint에 도착하면 다음 goal_pose setting
-            ROS_INFO("arrived at [%d]", set_goal_cnt);
-            if(set_goal_cnt == 0)
-            {
-                goal.pose.position.x = 0;
-                goal.pose.position.y = 5;
-                goal.pose.position.z = 5;
-                set_goal_cnt = 1;
-            }
-            else if(set_goal_cnt == 1)
-            {
-                goal.pose.position.x = 5;
-                goal.pose.position.y = 5;
-                goal.pose.position.z = 5;
-                set_goal_cnt = 2;
-            }
-            else if(set_goal_cnt == 2)
-            {
-                goal.pose.position.x = 5;
-                goal.pose.position.y = 0;
-                goal.pose.position.z = 5;
-                set_goal_cnt = 3;
-            }
-            else if(set_goal_cnt == 3)
-            {
-                goal.pose.position.x = 0;
-                goal.pose.position.y = 0;
-                goal.pose.position.z = 5;
-                set_goal_cnt = 0;
-            }
-        }
-
+        //position control
+        position_control(&goal);
         local_pos_pub.publish(goal);
             
         ros::spinOnce();
