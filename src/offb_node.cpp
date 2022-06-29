@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/TwistStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
@@ -11,7 +12,14 @@ nav_msgs::Odometry odom;
 
 int set_goal_cnt = 0;
 
-double dist(nav_msgs::Odometry now_pose, geometry_msgs::PoseStamped* goal);
+double pre_err_lin_x;
+double pre_err_lin_y;
+double pre_err_lin_z;
+
+const double kp = 0.45;
+const double kd = 0.15;
+
+double dist(nav_msgs::Odometry now_pose, geometry_msgs::PoseStamped goal);
 
 //------------------------------------------------------------//
 
@@ -28,63 +36,16 @@ void odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
     odom.pose.pose.position.y = msg->pose.pose.position.y;
     odom.pose.pose.position.z = msg->pose.pose.position.z;
 }
-double dist(nav_msgs::Odometry now, geometry_msgs::PoseStamped* goal)
+double dist(nav_msgs::Odometry now, geometry_msgs::PoseStamped goal)
 {
     double dist = sqrt(
-                        pow(now.pose.pose.position.x - (*goal).pose.position.x,2) + 
-                        pow(now.pose.pose.position.y - (*goal).pose.position.y,2) +
-                        pow(now.pose.pose.position.z - (*goal).pose.position.z,2)
+                        pow(now.pose.pose.position.x - goal.pose.position.x,2) + 
+                        pow(now.pose.pose.position.y - goal.pose.position.y,2) +
+                        pow(now.pose.pose.position.z - goal.pose.position.z,2)
                       );
 
     return dist;
 }
-
-void position_control(geometry_msgs::PoseStamped* goal_)
-{
-   geometry_msgs::PoseStamped* goal;
-   goal = goal_; //구조체 포인터로 주소값 받아옴
-
-   double* pose_x = &goal->pose.position.x;
-   double* pose_y = &goal->pose.position.y;
-   double* pose_z = &goal->pose.position.z;
-    
-   
-    if(dist(odom, goal) < 0.2)
-        {
-            //waypoint에 도착하면 다음 goal_pose setting
-            ROS_INFO("arrived at [%d]", set_goal_cnt);
-            if(set_goal_cnt == 0)
-            {
-                *pose_x = 0;
-                *pose_y = 2;
-                *pose_z = 2;
-                set_goal_cnt = 1;
-            }
-            else if(set_goal_cnt == 1)
-            {
-                *pose_x = 2;
-                *pose_y = 2;
-                *pose_z = 2;
-                set_goal_cnt = 2;
-            }
-            else if(set_goal_cnt == 2)
-            {
-                *pose_x = 2;
-                *pose_y = 0;
-                *pose_z = 2;
-                set_goal_cnt = 3;
-            }
-            else if(set_goal_cnt == 3)
-            {
-                *pose_x = 0;
-                *pose_y = 0;
-                *pose_z = 2;
-                set_goal_cnt = 0;
-            }
-        }
-        //local_pos_pub.publish(goal);
-}
-
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "offb_node");
@@ -99,7 +60,8 @@ int main(int argc, char **argv)
     //publisher
     ros::Publisher local_pos_pub = nh.advertise<geometry_msgs::PoseStamped>
             ("mavros/setpoint_position/local", 10);
-    
+    ros::Publisher local_vel_pub = nh.advertise<geometry_msgs::TwistStamped>
+            ("mavros/setpoint_velocity/cmd_vel", 10);
     //serviceclient
     ros::ServiceClient arming_client = nh.serviceClient<mavros_msgs::CommandBool>
             ("mavros/cmd/arming");
@@ -115,14 +77,16 @@ int main(int argc, char **argv)
         rate.sleep();
     }
 
-    geometry_msgs::PoseStamped goal;
-    goal.pose.position.x = 0;
-    goal.pose.position.y = 0;
-    goal.pose.position.z = 2;
+    geometry_msgs::PoseStamped goal_pose;
+    goal_pose.pose.position.x = 0;
+    goal_pose.pose.position.y = 0;
+    goal_pose.pose.position.z = 4;
+
+    geometry_msgs::TwistStamped goal_vel;
 
     //send a few setpoints before starting
     for(int i = 100; ros::ok() && i > 0; --i){
-        local_pos_pub.publish(goal);
+        local_pos_pub.publish(goal_pose);
         ros::spinOnce();
         rate.sleep();
     }
@@ -134,8 +98,12 @@ int main(int argc, char **argv)
     arm_cmd.request.value = true;
 
     ros::Time last_request = ros::Time::now();
+    ros::Time current_time, last_time;
+    current_time = ros::Time::now();
+    last_time = ros::Time::now();
 
     while(ros::ok()){
+
         if( current_state.mode != "OFFBOARD" &&
             (ros::Time::now() - last_request > ros::Duration(5.0))){
             if( set_mode_client.call(offb_set_mode) &&
@@ -154,11 +122,75 @@ int main(int argc, char **argv)
             }
         }
 
-        //position control
-        position_control(&goal);
-        local_pos_pub.publish(goal);
+        current_time = ros::Time::now();
+        double dt = (current_time - last_time).toSec();
+
+        if(dist(odom, goal_pose) < 0.18)
+        {
+            //waypoint에 도착하면 다음 goal_pose setting
+            //ROS_INFO("arrived at [%d]", set_goal_cnt);
+            if(set_goal_cnt == 0)
+            {
+                goal_pose.pose.position.x = 0;
+                goal_pose.pose.position.y = 4;
+                goal_pose.pose.position.z = 4;
+                set_goal_cnt = 1;
+            }
+            else if(set_goal_cnt == 1)
+            {
+                goal_pose.pose.position.x = 4;
+                goal_pose.pose.position.y = 4;
+                goal_pose.pose.position.z = 4;
+                set_goal_cnt = 2;
+            }
             
+            else if(set_goal_cnt == 2)
+            {
+                goal_pose.pose.position.x = 4;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 4;
+                set_goal_cnt = 3;
+            }
+            else if(set_goal_cnt == 3)
+            {
+                goal_pose.pose.position.x = 0;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 4;
+                set_goal_cnt = 0;
+            }
+        }
+
+        //local_pos_pub.publish(goal_pose); //postion control
+
+        double err_lin_x = goal_pose.pose.position.x - odom.pose.pose.position.x;
+        double err_lin_y = goal_pose.pose.position.y - odom.pose.pose.position.y;
+        double err_lin_z = goal_pose.pose.position.z - odom.pose.pose.position.z;
+       
+
+        goal_vel.twist.linear.x = kp*err_lin_x + kd*(err_lin_x - pre_err_lin_x)*dt;
+        goal_vel.twist.linear.y = kp*err_lin_y + kd*(err_lin_y - pre_err_lin_y)*dt;
+        goal_vel.twist.linear.z = kp*err_lin_z + kd*(err_lin_z - pre_err_lin_z)*dt;
+
+        if(goal_vel.twist.linear.x > 3)   goal_vel.twist.linear.x = 3;
+        if(goal_vel.twist.linear.x < -3)  goal_vel.twist.linear.x = -3;
+        if(goal_vel.twist.linear.y > 3)   goal_vel.twist.linear.y = 3;
+        if(goal_vel.twist.linear.y < -3)   goal_vel.twist.linear.y = -3;
+        if(goal_vel.twist.linear.z > 3)   goal_vel.twist.linear.z = 3;
+        if(goal_vel.twist.linear.z < -3)   goal_vel.twist.linear.z = -3;
+
+        local_vel_pub.publish(goal_vel);
+        
+        //ROS_INFO(" target_x : %.2f | target_y : %.2f | target_z : %.2f | ", goal_pose.pose.position.x, goal_pose.pose.position.y, goal_pose.pose.position.z);
+        ROS_INFO(" vx : %.2f | vy : %.2f | vz : %.2f | ", goal_vel.twist.linear.x, goal_vel.twist.linear.y, goal_vel.twist.linear.z);
+
+        pre_err_lin_x = err_lin_x;
+        pre_err_lin_y = err_lin_y;
+        pre_err_lin_z = err_lin_z;
+
+        last_time = current_time;
+        
         ros::spinOnce();
+
         rate.sleep();
     }
 
