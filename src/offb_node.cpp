@@ -11,6 +11,7 @@ mavros_msgs::State current_state;
 nav_msgs::Odometry odom;
 
 int set_goal_cnt = 0;
+int count = 0;
 
 double pre_err_lin_x;
 double pre_err_lin_y;
@@ -125,6 +126,8 @@ int main(int argc, char **argv)
         current_time = ros::Time::now();
         double dt = (current_time - last_time).toSec();
 
+        /*
+        //velocity_control square path
         if(dist(odom, goal_pose) < 0.18)
         {
             //waypoint에 도착하면 다음 goal_pose setting
@@ -159,9 +162,21 @@ int main(int argc, char **argv)
                 set_goal_cnt = 0;
             }
         }
-
+        */
         //local_pos_pub.publish(goal_pose); //postion control
 
+        //velocity_control circle path
+        const int r = 7;
+        double theta;
+
+        theta = count*0.01;
+
+        goal_pose.pose.position.x = r*cos(theta);
+        goal_pose.pose.position.y = r*sin(theta);
+        goal_pose.pose.position.z = 4;
+
+        count += 1;
+     
         double err_lin_x = goal_pose.pose.position.x - odom.pose.pose.position.x;
         double err_lin_y = goal_pose.pose.position.y - odom.pose.pose.position.y;
         double err_lin_z = goal_pose.pose.position.z - odom.pose.pose.position.z;
@@ -181,7 +196,7 @@ int main(int argc, char **argv)
         local_vel_pub.publish(goal_vel);
         
         //ROS_INFO(" target_x : %.2f | target_y : %.2f | target_z : %.2f | ", goal_pose.pose.position.x, goal_pose.pose.position.y, goal_pose.pose.position.z);
-        ROS_INFO(" vx : %.2f | vy : %.2f | vz : %.2f | ", goal_vel.twist.linear.x, goal_vel.twist.linear.y, goal_vel.twist.linear.z);
+        //ROS_INFO(" vx : %.2f | vy : %.2f | vz : %.2f | ", goal_vel.twist.linear.x, goal_vel.twist.linear.y, goal_vel.twist.linear.z);
 
         pre_err_lin_x = err_lin_x;
         pre_err_lin_y = err_lin_y;
