@@ -29,10 +29,6 @@ void state_cb(const mavros_msgs::State::ConstPtr& msg){
 }
 void odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
 
-    //ROS_INFO("Pos: [x] : %.2f |, [y] : %.2f |, [z] : %.2f", msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z);
-    //ROS_INFO("Orientation-> x: [%f], y: [%f], z: [%f], w: [%f]", msg->pose.pose.orientation.x, msg->pose.pose.orientation.y, msg->pose.pose.orientation.z, msg->pose.pose.orientation.w);
-
-    //get current position(odom)
     odom.pose.pose.position.x = msg->pose.pose.position.x;
     odom.pose.pose.position.y = msg->pose.pose.position.y;
     odom.pose.pose.position.z = msg->pose.pose.position.z;
@@ -126,11 +122,10 @@ int main(int argc, char **argv)
         current_time = ros::Time::now();
         double dt = (current_time - last_time).toSec();
 
-        /*
-        //velocity_control square path
+        //postition control - square path
+        #if 0
         if(dist(odom, goal_pose) < 0.18)
         {
-            //waypoint에 도착하면 다음 goal_pose setting
             //ROS_INFO("arrived at [%d]", set_goal_cnt);
             if(set_goal_cnt == 0)
             {
@@ -162,10 +157,12 @@ int main(int argc, char **argv)
                 set_goal_cnt = 0;
             }
         }
-        */
-        //local_pos_pub.publish(goal_pose); //postion control
+    
+        local_pos_pub.publish(goal_pose); 
+        #endif
 
-        //velocity_control circle path
+        //velocity_control - circle path
+        #if 0
         const int r = 7;
         double theta;
 
@@ -203,9 +200,14 @@ int main(int argc, char **argv)
         pre_err_lin_z = err_lin_z;
 
         last_time = current_time;
-        
-        ros::spinOnce();
+        #endif
 
+        //attitude + thrust control - square path
+        #if 0
+
+        #endif
+
+        ros::spinOnce();
         rate.sleep();
     }
 
