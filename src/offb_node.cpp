@@ -3,8 +3,10 @@
 #include <geometry_msgs/TwistStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/AttitudeTarget.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
+#include <tf/transform_datatypes.h>
 
 //----this code should be written in theh header file later----//
 mavros_msgs::State current_state;
@@ -17,8 +19,13 @@ double pre_err_lin_x;
 double pre_err_lin_y;
 double pre_err_lin_z;
 
-const double kp = 0.45;
-const double kd = 0.15;
+double pre_err_thrust;
+
+const double kp_lin_vel = 0.45;
+const double kd_lin_vel = 0.15;
+
+const double kp_thrust = 0.33; // 0.35 down
+const double kd_thrust = 1.2;
 
 double dist(nav_msgs::Odometry now_pose, geometry_msgs::PoseStamped goal);
 
@@ -29,9 +36,22 @@ void state_cb(const mavros_msgs::State::ConstPtr& msg){
 }
 void odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
 
-    odom.pose.pose.position.x = msg->pose.pose.position.x;
+    odom.pose.pose.position.x = msg->pose.pose.position.x;  
     odom.pose.pose.position.y = msg->pose.pose.position.y;
     odom.pose.pose.position.z = msg->pose.pose.position.z;
+
+    odom.pose.pose.orientation.x = msg->pose.pose.orientation.x;
+    odom.pose.pose.orientation.y = msg->pose.pose.orientation.y;
+    odom.pose.pose.orientation.z = msg->pose.pose.orientation.z;
+    odom.pose.pose.orientation.w = msg->pose.pose.orientation.w;
+
+    tf::Quaternion q(odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w);
+    tf::Matrix3x3 mat(q);
+
+    double roll, pitch, yaw;
+    mat.getRPY(roll,pitch,yaw);
+
+    ROS_INFO("%.2f | %.2f | %.2f ", roll,pitch,yaw);
 }
 double dist(nav_msgs::Odometry now, geometry_msgs::PoseStamped goal)
 {
@@ -59,6 +79,8 @@ int main(int argc, char **argv)
             ("mavros/setpoint_position/local", 10);
     ros::Publisher local_vel_pub = nh.advertise<geometry_msgs::TwistStamped>
             ("mavros/setpoint_velocity/cmd_vel", 10);
+    ros::Publisher att_pub = nh.advertise<mavros_msgs::AttitudeTarget>
+            ("mavros/setpoint_raw/attitude", 10);
     //serviceclient
     ros::ServiceClient arming_client = nh.serviceClient<mavros_msgs::CommandBool>
             ("mavros/cmd/arming");
@@ -80,6 +102,7 @@ int main(int argc, char **argv)
     goal_pose.pose.position.z = 4;
 
     geometry_msgs::TwistStamped goal_vel;
+    mavros_msgs::AttitudeTarget goal_att;
 
     //send a few setpoints before starting
     for(int i = 100; ros::ok() && i > 0; --i){
@@ -122,8 +145,9 @@ int main(int argc, char **argv)
         current_time = ros::Time::now();
         double dt = (current_time - last_time).toSec();
 
+        
         //postition control - square path
-        #if 0
+        #if 1
         if(dist(odom, goal_pose) < 0.18)
         {
             //ROS_INFO("arrived at [%d]", set_goal_cnt);
@@ -204,7 +228,51 @@ int main(int argc, char **argv)
 
         //attitude + thrust control - square path
         #if 0
+        if(dist(odom, goal_pose) < 0.18)
+        {
+            //ROS_INFO("arrived at [%d]", set_goal_cnt);
+            if(set_goal_cnt == 0)
+            {
+                goal_pose.pose.position.x = 0;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 4;
+                set_goal_cnt = 0;
+            }
+            else if(set_goal_cnt == 1)
+            {
+                goal_pose.pose.position.x = 4;
+                goal_pose.pose.position.y = 4;
+                goal_pose.pose.position.z = 4;
+                set_goal_cnt = 2;
+            }
+            
+            else if(set_goal_cnt == 2)
+            {
+                goal_pose.pose.position.x = 4;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 4;
+                set_goal_cnt = 3;
+            }
+            else if(set_goal_cnt == 3)
+            {
+                goal_pose.pose.position.x = 0;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 4;
+                set_goal_cnt = 0;
+            }
+        }
+        /*
+        //goal_att.thrust = 0.8;
+        double err_thrust = goal_pose.pose.position.z - odom.pose.pose.position.z;
+        goal_att.thrust = kp_thrust*err_thrust + kd_thrust*(err_thrust - pre_err_thrust)*dt;
 
+        //saturation
+
+        att_pub.publish(goal_att);
+
+        pre_err_lin_x = err_thrust;
+        last_time = current_time;
+        */
         #endif
 
         ros::spinOnce();
