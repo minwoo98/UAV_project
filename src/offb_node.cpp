@@ -318,10 +318,11 @@ int main(int argc, char **argv)
 
         geometry_msgs::Quaternion quat;
 
-        roll = -10*( 0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.05*(0-odom.twist.twist.linear.y) );
-        pitch = 10*( 0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) + 0.05*(0-odom.twist.twist.linear.x) ); 
+        roll = -5*( 0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.05*(0-odom.twist.twist.linear.y) ); //
+        pitch = 5*( 0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) + 0.05*(0-odom.twist.twist.linear.x) ); 
         yaw = 0.0;
-
+        ROS_INFO("%.2f | %.2f ", roll,pitch);
+        
         quat = rpy_to_quat(roll,pitch,yaw);
 
         double thrust = pre_thrust + 0.075*(goal_pose.pose.position.z - odom.pose.pose.position.z) + 0.2*(0-odom.twist.twist.linear.z); //0.075, 0.2
