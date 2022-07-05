@@ -42,8 +42,10 @@ const double kp_roll = 0.3;
 const double kp_pitch = 0.3;
 const double kp_yaw = 0.3;
 
-const double kp_thrust = 0.33; // 0.35 down
-const double kd_thrust = 1.2;
+double pre_thrust = 0.7;
+
+const double kp_thrust = 0.33;
+
 
 double dist(nav_msgs::Odometry now_pose, geometry_msgs::PoseStamped goal);
 
@@ -67,6 +69,10 @@ void odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
     odom.pose.pose.orientation.y = msg->pose.pose.orientation.y;
     odom.pose.pose.orientation.z = msg->pose.pose.orientation.z;
     odom.pose.pose.orientation.w = msg->pose.pose.orientation.w;
+
+    odom.twist.twist.linear.x = msg->twist.twist.linear.x;
+    odom.twist.twist.linear.y = msg->twist.twist.linear.y;
+    odom.twist.twist.linear.z = msg->twist.twist.linear.z;
 
     tf::Quaternion q(odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w);
     tf::Matrix3x3 mat(q);
@@ -137,7 +143,7 @@ int main(int argc, char **argv)
     geometry_msgs::PoseStamped goal_pose;
     goal_pose.pose.position.x = 0;
     goal_pose.pose.position.y = 0;
-    goal_pose.pose.position.z = 4;
+    goal_pose.pose.position.z = 2;
 
     geometry_msgs::TwistStamped goal_vel;
     mavros_msgs::AttitudeTarget goal_att;
@@ -275,15 +281,15 @@ int main(int argc, char **argv)
             {
                 
                 goal_pose.pose.position.x = 0;
-                goal_pose.pose.position.y = 4;
-                goal_pose.pose.position.z = 4;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 2;
                 set_goal_cnt = 1;
             }
             else if(set_goal_cnt == 1)
             {
                 goal_pose.pose.position.x = 0;
                 goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 4;
+                goal_pose.pose.position.z = 2;
                 set_goal_cnt = 0;
             }
             /*
@@ -306,53 +312,33 @@ int main(int argc, char **argv)
 
         //local_pos_pub.publish(goal_pose);  //
 
-        
-        double target_roll;
-        double offset_dist_y = goal_pose.pose.position.y - odom.pose.pose.position.y;
-        double err_roll;
-        double roll_output;
-        geometry_msgs::Quaternion att_quat;
-        
-        //남은 거리에 따른 목표roll 설정
-        if(offset_dist_y > 0)   target_roll = (-1)* kp_roll_dist * offset_dist_y; //원점->y축방향 이동
-        else if(offset_dist_y < 0)   target_roll = kp_roll_dist * offset_dist_y; //y축->원점방향 이동
 
-        err_roll = target_roll - roll;
+        //<thrust control - hovering>
+        //ROS_INFO("%.2f ", odom.twist.twist.linear.z );
+
+        geometry_msgs::Quaternion quat;
+
+        roll = -10*( 0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.05*(0-odom.twist.twist.linear.y) );
+        pitch = 10*( 0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) + 0.05*(0-odom.twist.twist.linear.x) ); 
+        yaw = 0.0;
+
+        quat = rpy_to_quat(roll,pitch,yaw);
+
+        double thrust = pre_thrust + 0.075*(goal_pose.pose.position.z - odom.pose.pose.position.z) + 0.2*(0-odom.twist.twist.linear.z); //0.075, 0.2
+                                     //0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y) +
+                                     //0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) +
         
-        //ROS_INFO("tar : %.2f | now: %.2f ", target_roll, roll);
-        roll_output = kp_roll*err_roll;
-        att_quat = rpy_to_quat(roll,pitch,yaw);
+        if(thrust < 0.7)    thrust = 0.7;
+        else if(thrust > 0.75)   thrust = 0.75;
 
         goal_att.type_mask = 7;
-        goal_att.thrust = 0.85;
-        goal_att.orientation = att_quat;
+        goal_att.thrust = thrust;
+        goal_att.orientation = quat;
 
         att_pub.publish(goal_att);
 
-
-        
-
-
-
-
-
-        //double target_pitch = kp_pitch_dist*(goal_pose.pose.position.x - odom.pose.pose.position.x);
-        //double tartget_yaw = kp_yaw_dist*(90 - odom.pose.pose.orientation.w);
-
-   
-        /* 
-        <thrust control>
-        //goal_att.thrust = 0.8;
-        double err_thrust = goal_pose.pose.position.z - odom.pose.pose.position.z;
-        goal_att.thrust = kp_thrust*err_thrust + kd_thrust*(err_thrust - pre_err_thrust)*dt;
-
-        //saturation
-
-        att_pub.publish(goal_att);
-
-        pre_err_lin_x = err_thrust;
-        last_time = current_time;
-        */
+        pre_thrust = thrust;
+      
         #endif
 
         ros::spinOnce();
