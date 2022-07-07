@@ -312,12 +312,12 @@ int main(int argc, char **argv)
         }
 
         geometry_msgs::Quaternion quat;
-        
+    /* 
         goal_vel.twist.linear.x = 0.25*(goal_pose.pose.position.x - odom.pose.pose.position.x); 
         goal_vel.twist.linear.y = 0.25*(goal_pose.pose.position.y - odom.pose.pose.position.y);
         goal_vel.twist.linear.z = 0.25*(goal_pose.pose.position.z - odom.pose.pose.position.z);
 
-/*
+
         if(goal_vel.twist.linear.x > 1) goal_vel.twist.linear.x = 1;
         else if(goal_vel.twist.linear.x < -0.8) goal_vel.twist.linear.x = -0.8;
         if(goal_vel.twist.linear.y > 0.8) goal_vel.twist.linear.y = 0.8;
@@ -339,36 +339,25 @@ int main(int argc, char **argv)
         else if(roll < -0.4)    roll = -0.4;
 
   
-        double att_quat;
+       
        
 
-/*
+    /*
+        double att_quat;
+
         if(roll < 0)    att_quat = 0.05*cos( -45 - roll*180/pi);
         else    att_quat = 0.05*cos( 45 - roll*180/pi);
         if(pitch < 0)    att_quat = 0.05*cos( -45 - pitch*180/pi);
         else    att_quat = 0.05*cos( 45 - pitch*180/pi);
-  */     
+    */     
+
         quat = rpy_to_quat(roll,pitch,yaw);
         double thrust = pre_thrust + 0.075*(goal_pose.pose.position.z - odom.pose.pose.position.z) + 0.2*(0-odom.twist.twist.linear.z); //0.075, 0.2
-                                   //+ att_quat;
-        
-        //ROS_INFO("att: %.2f  | %.2f", att_quat, goal_pose.pose.position.z - odom.pose.pose.position.z);
         
         //ROS_INFO("%.2f", thrust);
         //0.68 0.73
         if(thrust < 0.68)   thrust = 0.68;
-        else if(thrust > 0.73)   thrust = 0.73;
-/*
-        if(att_quat == 0.1)
-        {
-            if(thrust > 0.83)  thrust = 0.83;
-        }
-        else
-        {
-            if(thrust > 0.73)   thrust = 0.73;
-        }
-
-*/    
+        else if(thrust > 0.73)   thrust = 0.73;  
         
         goal_att.type_mask = 7;
         goal_att.thrust = thrust;
