@@ -10,6 +10,7 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
 #include <sensor_msgs/Imu.h>
+#include <cmath>
 
 //----this code should be written in theh header file later----//
 mavros_msgs::State current_state;
@@ -18,12 +19,13 @@ nav_msgs::Odometry odom;
 #define pi 3.141592
 
 double roll, pitch, yaw;
+double target_yaw;
 
 int set_goal_cnt = 0;
 int count = 0;
 
 
-double goal_yaw;
+
 double vth;
 
 double pre_err_lin_x;
@@ -194,47 +196,71 @@ int main(int argc, char **argv)
 
         current_time = ros::Time::now();
         double dt = (current_time - last_time).toSec();
-        double delta_th = vth * dt;
 
-        th += delta_th;
 
-        //ROS_INFO("%.2f | %.2f", th, yaw);
 
         //postition control - square path
         #if 0
-        if(dist(odom, goal_pose) < 0.18)
+
+        geometry_msgs::Quaternion quat;
+        ROS_INFO("%.3f", dist(odom, goal_pose));
+
+        if(dist(odom, goal_pose) < 0.3)
         {
             //ROS_INFO("arrived at [%d]", set_goal_cnt);
             if(set_goal_cnt == 0)
             {
-                goal_pose.pose.position.x = 0;
-                goal_pose.pose.position.y = 4;
-                goal_pose.pose.position.z = 4;
-                set_goal_cnt = 1;
+                target_yaw = 90*M_PI/180;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 0;
+                    goal_pose.pose.position.y = 4;
+                    goal_pose.pose.position.z = 4;
+
+                    set_goal_cnt = 1;
+                }
             }
             else if(set_goal_cnt == 1)
             {
-                goal_pose.pose.position.x = 4;
-                goal_pose.pose.position.y = 4;
-                goal_pose.pose.position.z = 4;
-                set_goal_cnt = 2;
+                target_yaw = 0;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 4;
+                    goal_pose.pose.position.y = 4;
+                    goal_pose.pose.position.z = 4;
+
+                    set_goal_cnt = 2;
+                }
             }
             
             else if(set_goal_cnt == 2)
             {
-                goal_pose.pose.position.x = 4;
-                goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 4;
-                set_goal_cnt = 3;
+                target_yaw = (-90)*M_PI/180;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 4;
+                    goal_pose.pose.position.y = 0;
+                    goal_pose.pose.position.z = 4;
+
+                    set_goal_cnt = 3;
+                }
             }
             else if(set_goal_cnt == 3)
             {
-                goal_pose.pose.position.x = 0;
-                goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 4;
-                set_goal_cnt = 0;
+                target_yaw = (-180)*M_PI/180;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 0;
+                    goal_pose.pose.position.y = 0;
+                    goal_pose.pose.position.z = 4;
+
+                    set_goal_cnt = 0;
+                }
             }
         }
+
+        quat = rpy_to_quat(0,0,target_yaw);
+        goal_pose.pose.orientation = quat;
     
         local_pos_pub.publish(goal_pose); 
 
@@ -284,49 +310,58 @@ int main(int argc, char **argv)
         //attitude + thrust control - square path
         #if 1
 
-        if(dist(odom, goal_pose) < 0.4)
+        if(dist(odom, goal_pose) < 0.3)
         {
             ROS_INFO("arrived at [%d]", set_goal_cnt);
             if(set_goal_cnt == 0)
-            {       
-                goal_pose.pose.position.x = 0;
-                goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 4;
-                goal_yaw = 90*pi/180;
+            {   
+                target_yaw = 90*M_PI/180;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 4;
+                    goal_pose.pose.position.y = 0;
+                    goal_pose.pose.position.z = 4;
 
-                set_goal_cnt = 1;       
+                    set_goal_cnt = 1;
+                }   
             }
          
             else if(set_goal_cnt == 1)
             {  
-                if( (goal_yaw - yaw) < 0.05 )
+                target_yaw = 0;
+                if( abs(yaw - target_yaw) < 0.1)
                 {
-                    goal_pose.pose.position.x = 0;
+                    goal_pose.pose.position.x = 4;
                     goal_pose.pose.position.y = 4;
                     goal_pose.pose.position.z = 4;
-                    goal_yaw = 0;
 
                     set_goal_cnt = 2;
-                }
+                }   
             }
             
             else if(set_goal_cnt == 2)
             {
-                goal_pose.pose.position.x = 4;
-                goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 4;
-                goal_yaw = (-90)*pi/180;
+                target_yaw = (-90)*M_PI/180;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 4;
+                    goal_pose.pose.position.y = 0;
+                    goal_pose.pose.position.z = 4;
 
-                set_goal_cnt = 3;
+                    set_goal_cnt = 3;
+                }    
             }
             else if(set_goal_cnt == 3)
             {
-                goal_pose.pose.position.x = 0;
-                goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 4;
-                goal_yaw = (-180)*pi/180;
+                target_yaw = (-180)*M_PI/180;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 0;
+                    goal_pose.pose.position.y = 0;
+                    goal_pose.pose.position.z = 4;
 
-                set_goal_cnt = 0;
+                    set_goal_cnt = 0;
+                }   
             }  
         }
         ROS_INFO("%.2f | %.2f | %.2f ", goal_pose.pose.position.x -odom.pose.pose.position.x, goal_pose.pose.position.y - odom.pose.pose.position.y, goal_pose.pose.position.z - odom.pose.pose.position.z);
@@ -336,11 +371,9 @@ int main(int argc, char **argv)
         goal_vel.twist.linear.x = 0.2*(goal_pose.pose.position.x - odom.pose.pose.position.x); 
         goal_vel.twist.linear.y = 0.2*(goal_pose.pose.position.y - odom.pose.pose.position.y);
         goal_vel.twist.linear.z = 0.2*(goal_pose.pose.position.z - odom.pose.pose.position.z);
-        goal_vel.twist.angular.z = 0.2*(goal_yaw - th);
 
-        roll = (-1)*( 0.07*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.1*( goal_vel.twist.linear.y - odom.twist.twist.linear.y) );
-        pitch =   1*( 0.07*(goal_pose.pose.position.x - odom.pose.pose.position.x) + 0.1*( goal_vel.twist.linear.x - odom.twist.twist.linear.x) );
-        yaw += 0.1*(goal_yaw - th) + 0.1*(goal_vel.twist.angular.z - vth);
+        roll = (-1)*( 0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.1*( goal_vel.twist.linear.y - odom.twist.twist.linear.y) );
+        pitch =   1*( 0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) + 0.1*( goal_vel.twist.linear.x - odom.twist.twist.linear.x) );
         
         if(roll > 0.5)  roll = 0.5;
         else if(roll < -0.5) roll = -0.5;
@@ -357,7 +390,7 @@ int main(int argc, char **argv)
         if(goal_vel.twist.linear.z > 1) goal_vel.twist.linear.z = 1;
         else if(goal_vel.twist.linear.z < -1) goal_vel.twist.linear.z = -1;    
 
-        quat = rpy_to_quat(roll,pitch,yaw);
+        quat = rpy_to_quat(roll,pitch,target_yaw);
         double thrust = pre_thrust + 0.075*(goal_pose.pose.position.z - odom.pose.pose.position.z) + 0.2*(goal_vel.twist.linear.z-odom.twist.twist.linear.z); //0.075, 0.2
        
         //ROS_INFO("%.2f", thrust);
