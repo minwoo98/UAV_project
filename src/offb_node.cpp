@@ -20,6 +20,7 @@ nav_msgs::Odometry odom;
 double roll, pitch, yaw;
 
 int set_goal_cnt = 0;
+bool thrust_flag = false;
 int count = 0;
 
 double vth;
@@ -145,7 +146,7 @@ int main(int argc, char **argv)
     geometry_msgs::PoseStamped goal_pose;
     goal_pose.pose.position.x = 0;
     goal_pose.pose.position.y = 0;
-    goal_pose.pose.position.z = 2;
+    goal_pose.pose.position.z = 4;
 
     geometry_msgs::TwistStamped goal_vel;
     mavros_msgs::AttitudeTarget goal_att;
@@ -276,88 +277,72 @@ int main(int argc, char **argv)
         //attitude + thrust control - square path
         #if 1
 
-        if(dist(odom, goal_pose) < 0.2)
+        if(dist(odom, goal_pose) < 0.18)
         {
-            //ROS_INFO("arrived at [%d]", set_goal_cnt);
+            ROS_INFO("arrived at [%d]", set_goal_cnt);
             if(set_goal_cnt == 0)
             {   
                 goal_pose.pose.position.x = 0;
-                goal_pose.pose.position.y = 6;
-                goal_pose.pose.position.z = 2;
+                goal_pose.pose.position.y = 4;
+                goal_pose.pose.position.z = 4;
                 set_goal_cnt = 1;
             }
             else if(set_goal_cnt == 1)
             {
-                goal_pose.pose.position.x = 0;
-                goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 2;
-                set_goal_cnt = 0;
+                goal_pose.pose.position.x = 4;
+                goal_pose.pose.position.y = 4;
+                goal_pose.pose.position.z = 4;
+                set_goal_cnt = 2;
             }
             
             else if(set_goal_cnt == 2)
             {
                 goal_pose.pose.position.x = 4;
                 goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 2;
+                goal_pose.pose.position.z = 4;
                 set_goal_cnt = 3;
             }
             else if(set_goal_cnt == 3)
             {
                 goal_pose.pose.position.x = 0;
                 goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 2;
+                goal_pose.pose.position.z = 4;
                 set_goal_cnt = 0;
-            }
-            
+            }  
         }
 
         geometry_msgs::Quaternion quat;
-    /* 
-        goal_vel.twist.linear.x = 0.25*(goal_pose.pose.position.x - odom.pose.pose.position.x); 
-        goal_vel.twist.linear.y = 0.25*(goal_pose.pose.position.y - odom.pose.pose.position.y);
-        goal_vel.twist.linear.z = 0.25*(goal_pose.pose.position.z - odom.pose.pose.position.z);
 
+        goal_vel.twist.linear.x = 0.2*(goal_pose.pose.position.x - odom.pose.pose.position.x); 
+        goal_vel.twist.linear.y = 0.2*(goal_pose.pose.position.y - odom.pose.pose.position.y);
+        goal_vel.twist.linear.z = 0.2*(goal_pose.pose.position.z - odom.pose.pose.position.z);
+
+        roll = (-1)*( 0.07*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.1*( goal_vel.twist.linear.y - odom.twist.twist.linear.y) );
+        pitch =   1*( 0.07*(goal_pose.pose.position.x - odom.pose.pose.position.x) + 0.1*( goal_vel.twist.linear.x - odom.twist.twist.linear.x) );
+        yaw = 0.0;
+
+        if(roll > 0.5)  roll = 0.5;
+        else if(roll < -0.5) roll = -0.5;
+        if(pitch > 0.5)  pitch = 0.5;
+        else if(pitch < -0.5) pitch = -0.5;
+
+        //ROS_INFO("%.2f | %.2f | %.2f ", roll, -1*0.08*(goal_pose.pose.position.y - odom.pose.pose.position.y), -1*0.1*( goal_vel.twist.linear.y - odom.twist.twist.linear.y));
 
         if(goal_vel.twist.linear.x > 1) goal_vel.twist.linear.x = 1;
-        else if(goal_vel.twist.linear.x < -0.8) goal_vel.twist.linear.x = -0.8;
-        if(goal_vel.twist.linear.y > 0.8) goal_vel.twist.linear.y = 0.8;
-        else if(goal_vel.twist.linear.y < -0.8) goal_vel.twist.linear.y = -0.8;
-        if(goal_vel.twist.linear.z > 0.8) goal_vel.twist.linear.z = 0.8;
-        else if(goal_vel.twist.linear.z < -0.8) goal_vel.twist.linear.z = -0.8;
-   */     
+        else if(goal_vel.twist.linear.x < -1) goal_vel.twist.linear.x = -1;
+        if(goal_vel.twist.linear.y > 1) goal_vel.twist.linear.y = 1;
+        else if(goal_vel.twist.linear.y < -1) goal_vel.twist.linear.y = -1;
+        if(goal_vel.twist.linear.z > 1) goal_vel.twist.linear.z = 1;
+        else if(goal_vel.twist.linear.z < -1) goal_vel.twist.linear.z = -1;    
 
-        //roll = -1*( 0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.05*(0-odom.twist.twist.linear.y) );//0.1, 0.05, hovering store
-
-        /*
-        roll = -1*( 0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.2*(goal_vel.twist.linear.y-odom.twist.twist.linear.y) ); //0.25 down
-        pitch = 1*( 0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) + 0.2*(goal_vel.twist.linear.x-odom.twist.twist.linear.x) ); 
-        yaw = 0.0;
-        */
-
-        //ROS_INFO("%.2f", roll*180/pi);
-        if(roll > 0.4)  roll = 0.4;
-        else if(roll < -0.4)    roll = -0.4;
-
-  
+        quat = rpy_to_quat(roll,pitch,0);
+        double thrust = pre_thrust + 0.075*(goal_pose.pose.position.z - odom.pose.pose.position.z) + 0.2*(goal_vel.twist.linear.z-odom.twist.twist.linear.z); //0.075, 0.2
        
-       
-
-    /*
-        double att_quat;
-
-        if(roll < 0)    att_quat = 0.05*cos( -45 - roll*180/pi);
-        else    att_quat = 0.05*cos( 45 - roll*180/pi);
-        if(pitch < 0)    att_quat = 0.05*cos( -45 - pitch*180/pi);
-        else    att_quat = 0.05*cos( 45 - pitch*180/pi);
-    */     
-
-        quat = rpy_to_quat(roll,pitch,yaw);
-        double thrust = pre_thrust + 0.075*(goal_pose.pose.position.z - odom.pose.pose.position.z) + 0.2*(0-odom.twist.twist.linear.z); //0.075, 0.2
-        
         //ROS_INFO("%.2f", thrust);
-        //0.68 0.73
-        if(thrust < 0.68)   thrust = 0.68;
-        else if(thrust > 0.73)   thrust = 0.73;  
+
+        //hovering 0.68 0.72
+        if(thrust < 0.6575)   thrust = 0.6575; 
+        if(thrust > 0.72)   thrust = 0.72 + 0.025*abs(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.025*abs(goal_pose.pose.position.x - odom.pose.pose.position.x);
         
         goal_att.type_mask = 7;
         goal_att.thrust = thrust;
