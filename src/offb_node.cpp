@@ -25,7 +25,6 @@ int set_goal_cnt = 0;
 int count = 0;
 
 
-
 double vth;
 
 double pre_err_lin_x;
@@ -39,17 +38,18 @@ double pre_err_thrust;
 
 const double kp_lin_vel = 0.45;
 const double kd_lin_vel = 0.15;
-
+/*
 const double kp_roll_dist = 0.15;
 const double kp_pitch_dist = 0.3;
 const double kp_yaw_dist = 0.3;
 const double kp_roll = 0.3;
 const double kp_pitch = 0.3;
 const double kp_yaw = 0.3;
-
+*/
 double pre_thrust = 0.7;
-
 const double kp_thrust = 0.33;
+
+ double deg = 90;
 
 
 double dist(nav_msgs::Odometry now_pose, geometry_msgs::PoseStamped goal);
@@ -150,6 +150,8 @@ int main(int argc, char **argv)
     goal_pose.pose.position.y = 0;
     goal_pose.pose.position.z = 4;
 
+
+
     geometry_msgs::TwistStamped goal_vel;
     mavros_msgs::AttitudeTarget goal_att;
 
@@ -196,7 +198,6 @@ int main(int argc, char **argv)
 
         current_time = ros::Time::now();
         double dt = (current_time - last_time).toSec();
-
 
 
         //postition control - square path
@@ -267,6 +268,56 @@ int main(int argc, char **argv)
 
         #endif
 
+        //position_control - circle
+        #if 1
+        int r = 0;
+        double target_yaw = 0;
+        double theta;
+        geometry_msgs::Quaternion quat;
+
+        
+        if( (dist(odom, goal_pose) < 0.2) && set_goal_cnt == 0)
+        {
+            //initial pose setting
+            goal_pose.pose.position.x = 4;
+            goal_pose.pose.position.y = 0;
+            goal_pose.pose.position.z = 4;
+
+            target_yaw = 90*M_PI/180;
+            ROS_INFO("1");
+            if(abs(yaw - target_yaw) < 0.1)
+            {
+                ROS_INFO("2");
+                set_goal_cnt = 1;
+            }
+        }
+        else if(set_goal_cnt == 1)
+        {
+            target_yaw = deg*M_PI/180;
+            theta = count*0.01;
+            if(deg >= 180)
+            {
+                deg = -180;
+            }
+       
+            deg += 0.01*180/M_PI;
+            count += 1;     
+
+            goal_pose.pose.position.x = 4*cos(theta);
+            goal_pose.pose.position.y = 4*sin(theta);
+            goal_pose.pose.position.z = 4;
+            
+        }
+
+        ROS_INFO("deg: %.2f | theta: %.2f", deg, theta);
+        target_yaw = deg*M_PI/180;
+
+        quat = rpy_to_quat(0,0,target_yaw);
+        goal_pose.pose.orientation = quat;
+        local_pos_pub.publish(goal_pose);
+
+        #endif
+
         //velocity_control - circle path
         #if 0
         const int r = 7;
@@ -309,7 +360,7 @@ int main(int argc, char **argv)
         #endif
 
         //attitude + thrust control - square path
-        #if 1
+        #if 0
 
         if(dist(odom, goal_pose) < 0.3)
         {
@@ -402,17 +453,13 @@ int main(int argc, char **argv)
         else if(roll < -0.5) roll = -0.5;
         if(pitch > 0.5)  pitch = 0.5;
         else if(pitch < -0.5) pitch = -0.5;
-
-        //ROS_INFO("%.2f ", yaw);
        
         if(goal_vel.twist.linear.x > 1) goal_vel.twist.linear.x = 1;
         else if(goal_vel.twist.linear.x < -1) goal_vel.twist.linear.x = -1;
         if(goal_vel.twist.linear.y > 1) goal_vel.twist.linear.y = 1;
         else if(goal_vel.twist.linear.y < -1) goal_vel.twist.linear.y = -1;
         if(goal_vel.twist.linear.z > 1) goal_vel.twist.linear.z = 1;
-        else if(goal_vel.twist.linear.z < -1) goal_vel.twist.linear.z = -1;    
 
-        //quat = rpy_to_quat(roll,pitch,0);
         quat = rpy_to_quat(roll,pitch,target_yaw);
      
         double thrust = pre_thrust + 0.075*(goal_pose.pose.position.z - odom.pose.pose.position.z) + 0.2*(goal_vel.twist.linear.z-odom.twist.twist.linear.z); //0.075, 0.2
@@ -421,7 +468,7 @@ int main(int argc, char **argv)
 
         //hovering 0.68 0.72
         if(thrust < 0.6575)   thrust = 0.6575; 
-        if(thrust > 0.72)   thrust = 0.72 + 0.025*abs(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.025*abs(goal_pose.pose.position.x - odom.pose.pose.position.x);
+        if(thrust > 0.73)   thrust = 0.725 + 0.03*abs(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.03*abs(goal_pose.pose.position.x - odom.pose.pose.position.x);
         
         goal_att.type_mask = 7;
         goal_att.thrust = thrust;
@@ -433,6 +480,20 @@ int main(int argc, char **argv)
 
         last_time = current_time;
       
+        #endif
+
+        //attitude control - circle
+        #if 0
+        
+        const int r = 5;
+        double theta;
+
+        theta = count*0.01;
+
+        goal_pose.pose.position.x = r*cos(theta);
+        goal_pose.pose.position.y = r*sin(theta);
+        goal_pose.pose.position.z = 4;
+
         #endif
 
         ros::spinOnce();
