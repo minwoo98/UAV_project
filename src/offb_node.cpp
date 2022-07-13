@@ -146,7 +146,7 @@ int main(int argc, char **argv)
     }
 
     geometry_msgs::PoseStamped goal_pose;
-    goal_pose.pose.position.x = 0;
+    goal_pose.pose.position.x = 4;
     goal_pose.pose.position.y = 0;
     goal_pose.pose.position.z = 4;
 
@@ -269,7 +269,7 @@ int main(int argc, char **argv)
         #endif
 
         //position_control - circle
-        #if 1
+        #if 0
         int r = 0;
         double target_yaw = 0;
         double theta;
@@ -284,10 +284,9 @@ int main(int argc, char **argv)
             goal_pose.pose.position.z = 4;
 
             target_yaw = 90*M_PI/180;
-            ROS_INFO("1");
+
             if(abs(yaw - target_yaw) < 0.1)
             {
-                ROS_INFO("2");
                 set_goal_cnt = 1;
             }
         }
@@ -309,7 +308,7 @@ int main(int argc, char **argv)
             
         }
 
-        ROS_INFO("deg: %.2f | theta: %.2f", deg, theta);
+        //ROS_INFO("deg: %.2f | theta: %.2f", deg, theta);
         target_yaw = deg*M_PI/180;
 
         quat = rpy_to_quat(0,0,target_yaw);
@@ -483,16 +482,68 @@ int main(int argc, char **argv)
         #endif
 
         //attitude control - circle
-        #if 0
+        #if 1
         
-        const int r = 5;
         double theta;
+        double target_yaw = 0;
+        geometry_msgs::Quaternion quat;
 
         theta = count*0.01;
 
-        goal_pose.pose.position.x = r*cos(theta);
-        goal_pose.pose.position.y = r*sin(theta);
-        goal_pose.pose.position.z = 4;
+        if( (dist(odom, goal_pose) < 0.2) && set_goal_cnt == 0)
+        {
+             target_yaw = 90*M_PI/180;
+
+            if(abs(yaw - target_yaw) < 0.1)
+            {
+                set_goal_cnt = 1;
+            }
+        }
+        else if(set_goal_cnt == 1)
+        { 
+            target_yaw = deg*M_PI/180;
+            theta = count*0.01;
+            if(deg >= 180)
+            {
+                deg = -180;
+            }
+       
+            deg += 0.01*180/M_PI;
+            count += 1;     
+
+            goal_pose.pose.position.x = 4*cos(theta);
+            goal_pose.pose.position.y = 4*sin(theta);
+            goal_pose.pose.position.z = 4;
+
+        }
+
+        roll = 0.1*(sin(yaw)*(goal_pose.pose.position.x - odom.pose.pose.position.x) - cos(yaw)*(goal_pose.pose.position.y - odom.pose.pose.position.y) + odom.twist.twist.linear.y);
+        pitch = 0.1*(cos(yaw)*(goal_pose.pose.position.x - odom.pose.pose.position.x) + sin(yaw)*(goal_pose.pose.position.y - odom.pose.pose.position.y) - odom.twist.twist.linear.x);
+
+        target_yaw = deg*M_PI/180;
+
+        if(roll > 0.5)  roll = 0.5;
+        else if(roll < -0.5) roll = -0.5;
+        if(pitch > 0.5)  pitch = 0.5;
+        else if(pitch < -0.5) pitch = -0.5;
+
+        quat = rpy_to_quat(roll,pitch,target_yaw);
+     
+        double thrust = pre_thrust + 0.075*(goal_pose.pose.position.z - odom.pose.pose.position.z) + 0.2*(goal_vel.twist.linear.z-odom.twist.twist.linear.z); //0.075, 0.2
+       
+        //ROS_INFO("%.2f", thrust);
+
+        //hovering 0.68 0.72
+        if(thrust < 0.6575)   thrust = 0.6575; 
+        if(thrust > 0.73)   thrust = 0.725 + 0.03*abs(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.03*abs(goal_pose.pose.position.x - odom.pose.pose.position.x);
+        
+        goal_att.type_mask = 7;
+        goal_att.thrust = thrust;
+        goal_att.orientation = quat;
+
+        att_pub.publish(goal_att);
+
+        pre_thrust = thrust;
 
         #endif
 
