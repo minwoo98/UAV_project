@@ -437,24 +437,24 @@ int main(int argc, char **argv)
             goal_vel.twist.linear.y = (-0.2)*(goal_pose.pose.position.x - odom.pose.pose.position.x);
             goal_vel.twist.linear.z = 0.2*(goal_pose.pose.position.z - odom.pose.pose.position.z);
         }
-       
+       /*
         if(set_goal_cnt == 0 || set_goal_cnt == 1)
-        {/*
+        {
             roll = (-1)*( 0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.1*( goal_vel.twist.linear.y - odom.twist.twist.linear.y) );
             pitch =   1*( 0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) + 0.1*( goal_vel.twist.linear.x - odom.twist.twist.linear.x) );
-            */
+            
             roll = (-1)*( 0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y))+ 0.1*odom.twist.twist.linear.y;
             pitch =  0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) - 0.1*odom.twist.twist.linear.x;
         }
-        /*
+        
         else if(set_goal_cnt == 1)
         {
             roll = 1*( 0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) + (-0.1)*( goal_vel.twist.linear.y - odom.twist.twist.linear.y));
             pitch =  1*( 0.1*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.1*( goal_vel.twist.linear.x - odom.twist.twist.linear.x)) ;  
         }*/
 
-        //roll = 0.1*(sin(yaw)*(goal_pose.pose.position.x - odom.pose.pose.position.x) - cos(yaw)*(goal_pose.pose.position.y - odom.pose.pose.position.y) + odom.twist.twist.linear.y);
-        //pitch = 0.1*(cos(yaw)*(goal_pose.pose.position.x - odom.pose.pose.position.x) + sin(yaw)*(goal_pose.pose.position.y - odom.pose.pose.position.y) - odom.twist.twist.linear.x);
+        roll = 0.1*(sin(yaw)*(goal_pose.pose.position.x - odom.pose.pose.position.x) - cos(yaw)*(goal_pose.pose.position.y - odom.pose.pose.position.y) + odom.twist.twist.linear.y);
+        pitch = 0.1*(cos(yaw)*(goal_pose.pose.position.x - odom.pose.pose.position.x) + sin(yaw)*(goal_pose.pose.position.y - odom.pose.pose.position.y) - odom.twist.twist.linear.x);
 
         //ROS_INFO("%.2f | %.2f ", odom.twist.twist.linear.x, odom.twist.twist.linear.y);  
 
@@ -562,45 +562,75 @@ int main(int argc, char **argv)
         geometry_msgs::Quaternion quat;
         ROS_INFO("cnt: [%d]", set_goal_cnt);
 
-        if(dist(odom, goal_pose) < 0.3)
+        if(dist(odom, goal_pose) < 0.25)
         {
             if(set_goal_cnt == 0)
             {    
-                goal_pose.pose.position.x = 0;
-                goal_pose.pose.position.y = 4;
-                goal_pose.pose.position.z = 4;
+                target_yaw = 90*M_PI/180;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 0;
+                    goal_pose.pose.position.y = 4;
+                    goal_pose.pose.position.z = 4;
             
-                set_goal_cnt =1;
+                    set_goal_cnt =1;
+                }
             }
             else if(set_goal_cnt == 1)
             {
-                goal_pose.pose.position.x = 0;
-                goal_pose.pose.position.y = 0;
-                goal_pose.pose.position.z = 4;
+                target_yaw = 0;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 4;
+                    goal_pose.pose.position.y = 4;
+                    goal_pose.pose.position.z = 4;
 
-                set_goal_cnt = 0;
+                    set_goal_cnt = 2;
+                }
+            }
+            else if(set_goal_cnt == 2)
+            {
+                target_yaw = (-90)*M_PI/180;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 4;
+                    goal_pose.pose.position.y = 0;
+                    goal_pose.pose.position.z = 4;
+
+                    set_goal_cnt = 3;
+                }
+            }
+            else if(set_goal_cnt == 3)
+            {
+                target_yaw = (-180)*M_PI/180;
+                if( abs(yaw - target_yaw) < 0.1)
+                {
+                    goal_pose.pose.position.x = 0;
+                    goal_pose.pose.position.y = 0;
+                    goal_pose.pose.position.z = 4;
+
+                    set_goal_cnt = 0;
+                }
             }
         }
 
         goal_vel.twist.linear.z = 0.2*(goal_pose.pose.position.z - odom.pose.pose.position.z);
-
+        /*
         target_roll = (-0.1)*(goal_pose.pose.position.y - odom.pose.pose.position.y) + 0.2*odom.twist.twist.linear.y;
         target_pitch = 0.1*(goal_pose.pose.position.x - odom.pose.pose.position.x) - 0.2*odom.twist.twist.linear.x; 
-
+        */
+        target_roll = 0.1*(sin(yaw)*(goal_pose.pose.position.x - odom.pose.pose.position.x) - cos(yaw)*(goal_pose.pose.position.y - odom.pose.pose.position.y))+ 0.25*odom.twist.twist.linear.y;
+        target_pitch = 0.1*(cos(yaw)*(goal_pose.pose.position.x - odom.pose.pose.position.x) + sin(yaw)*(goal_pose.pose.position.y - odom.pose.pose.position.y)) - 0.25*odom.twist.twist.linear.x;
+        
         if(target_roll > 0.4)  target_roll = 0.4;
         else if(target_roll < -0.4) target_roll = -0.4;
         if(target_pitch > 0.4)  target_pitch = 0.4;
         else if(target_pitch < -0.4) target_pitch = -0.4;
-        if(roll > 0.4)  roll = 0.4;
-        else if(roll < -0.4) roll = -0.4;
-        if(pitch > 0.4)  pitch = 0.4;
-        else if(pitch < -0.4) pitch = -0.4;
 
-        //quat = rpy_to_quat(target_roll,target_pitch,0);
-
-        goal_att.body_rate.y = 0.88*(target_pitch - pitch); //rate.y -> x axies 
-        goal_att.body_rate.x = 0.88*(target_roll - roll); //rate.x -> y axies 
-        goal_att.body_rate.z = 0;
+        //gain initial 0.88
+        goal_att.body_rate.y = 0.8*(target_pitch - pitch); //rate.y -> x axies 
+        goal_att.body_rate.x = 0.8*(target_roll - roll); //rate.x -> y axies 
+        goal_att.body_rate.z = 0.4*(target_yaw - yaw);
  
         ROS_INFO("%.2f | %.2f ", target_roll, roll);
 
@@ -612,8 +642,6 @@ int main(int argc, char **argv)
         pre_thrust = thrust;
 
         goal_att.type_mask = 128; //rate
-        //goal_att.type_mask = 7; //quat
-        //goal_att.orientation = quat;
         goal_att.thrust = thrust;
         att_pub.publish(goal_att);
         
