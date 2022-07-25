@@ -25,8 +25,10 @@ double target_roll,target_pitch,target_yaw;
 int set_goal_cnt = 0;
 int count = 0;
 
-
 double vth;
+
+double kp = 0.45;
+double kd = 0.15;
 
 double pre_err_lin_x;
 double pre_err_lin_y;
@@ -153,7 +155,7 @@ int main(int argc, char **argv)
     geometry_msgs::PoseStamped goal_pose;
     goal_pose.pose.position.x = 0;
     goal_pose.pose.position.y = 0;
-    goal_pose.pose.position.z = 4;
+    goal_pose.pose.position.z = 3;
 
 
 
@@ -205,7 +207,7 @@ int main(int argc, char **argv)
         double dt = (current_time - last_time).toSec();
 
 
-        //postition control - square
+        //postition control + yaw - square
         #if 0
 
         geometry_msgs::Quaternion quat;
@@ -220,9 +222,9 @@ int main(int argc, char **argv)
                 target_yaw = 90*M_PI/180;
                 if( abs(yaw - target_yaw) < 0.1)
                 {
-                    goal_pose.pose.position.x = 0;
-                    goal_pose.pose.position.y = 4;
-                    goal_pose.pose.position.z = 4;
+                    goal_pose.pose.position.x = 5;
+                    goal_pose.pose.position.y = 0;
+                    goal_pose.pose.position.z = 6;
 
                     set_goal_cnt = 1;
                 }
@@ -232,9 +234,9 @@ int main(int argc, char **argv)
                 target_yaw = 0;
                 if( abs(yaw - target_yaw) < 0.1)
                 {
-                    goal_pose.pose.position.x = 4;
-                    goal_pose.pose.position.y = 4;
-                    goal_pose.pose.position.z = 4;
+                    goal_pose.pose.position.x = 5;
+                    goal_pose.pose.position.y = -5;
+                    goal_pose.pose.position.z = 8;
 
                     set_goal_cnt = 2;
                 }
@@ -245,8 +247,8 @@ int main(int argc, char **argv)
                 target_yaw = (-90)*M_PI/180;
                 if( abs(yaw - target_yaw) < 0.1)
                 {
-                    goal_pose.pose.position.x = 4;
-                    goal_pose.pose.position.y = 0;
+                    goal_pose.pose.position.x = -5;
+                    goal_pose.pose.position.y = -5;
                     goal_pose.pose.position.z = 4;
 
                     set_goal_cnt = 3;
@@ -257,9 +259,9 @@ int main(int argc, char **argv)
                 target_yaw = (-180)*M_PI/180;
                 if( abs(yaw - target_yaw) < 0.1)
                 {
-                    goal_pose.pose.position.x = 0;
-                    goal_pose.pose.position.y = 0;
-                    goal_pose.pose.position.z = 4;
+                    goal_pose.pose.position.x = 6;
+                    goal_pose.pose.position.y = 6;
+                    goal_pose.pose.position.z = 2;
 
                     set_goal_cnt = 0;
                 }
@@ -270,6 +272,73 @@ int main(int argc, char **argv)
         goal_pose.pose.orientation = quat;
     
         local_pos_pub.publish(goal_pose); 
+
+        #endif
+
+        #if 1
+        if(dist(odom, goal_pose) < 0.2)
+        {
+            //waypoint에 도착하면 다음 goal_pose setting
+            ROS_INFO("arrived at [%d]", set_goal_cnt);
+            if(set_goal_cnt == 0)
+            {
+                goal_pose.pose.position.x = 0;
+                goal_pose.pose.position.y = 5;
+                goal_pose.pose.position.z = 3;
+                set_goal_cnt = 1;
+            }
+            else if(set_goal_cnt == 1)
+            {
+                goal_pose.pose.position.x = -5;
+                goal_pose.pose.position.y = 5;
+                goal_pose.pose.position.z = 3;
+                set_goal_cnt = 2;
+            }
+            else if(set_goal_cnt == 2)
+            {
+                goal_pose.pose.position.x = -5;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 3;
+                set_goal_cnt = 3;
+            }
+            else if(set_goal_cnt == 3)
+            {
+                goal_pose.pose.position.x = 0;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 3;
+                set_goal_cnt = 4;
+            }
+            else if(set_goal_cnt == 4)
+             {
+                goal_pose.pose.position.x = 0;
+                goal_pose.pose.position.y = -5;
+                goal_pose.pose.position.z = 3;
+                set_goal_cnt = 5;
+            }
+            else if(set_goal_cnt == 5)
+             {
+                goal_pose.pose.position.x = -5;
+                goal_pose.pose.position.y = -5;
+                goal_pose.pose.position.z = 3;
+                set_goal_cnt = 6;
+            }
+            else if(set_goal_cnt == 6)
+            {
+                goal_pose.pose.position.x = -5;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 3;
+                set_goal_cnt = 7;
+            }
+            else if(set_goal_cnt == 7)
+            {
+                goal_pose.pose.position.x = 0;
+                goal_pose.pose.position.y = 0;
+                goal_pose.pose.position.z = 3;
+                set_goal_cnt = 0;
+            }
+        }
+
+        local_pos_pub.publish(goal_pose);
 
         #endif
 
@@ -324,14 +393,14 @@ int main(int argc, char **argv)
 
         //velocity_control - circle
         #if 0
-        const int r = 7;
+        const int r = 6;
         double theta;
 
         theta = count*0.01;
 
         goal_pose.pose.position.x = r*cos(theta);
         goal_pose.pose.position.y = r*sin(theta);
-        goal_pose.pose.position.z = 4;
+        goal_pose.pose.position.z = 3;
 
         count += 1;
      
@@ -558,7 +627,7 @@ int main(int argc, char **argv)
         #endif
 
         //rate control - square
-        #if 1
+        #if 0
         geometry_msgs::Quaternion quat;
         ROS_INFO("cnt: [%d]", set_goal_cnt);
 
